@@ -1,23 +1,32 @@
 /**
- * The open file and what the user is looking at. The selected collection and item live in the
+ * The open document and what the user is looking at. The selected collection and item live in the
  * URL hash (`#/c/<collection>/i/<item>`), so Back closes the item panel and links can be shared
  * between people who have the same file.
+ *
+ * Every change goes through {@link Session.edit}, which records the manifest before the change
+ * so it can be undone. The manifest is deeply reactive, so views follow changes made to it.
  */
 
 import {
+  TasteDocument,
   TasteFile,
+  guessType,
   matchesItem,
   matchesKind,
+  slugify,
   tagPairs,
   unsorted,
   type Collection,
   type Entry,
   type Item,
   type Manifest,
+  type NewFile,
   type Problem,
   type TasteFileEntry,
 } from "@ruverse/taste";
-import type { OpenedFile } from "./platform.ts";
+import { defaultRole } from "./editing.ts";
+import { describeImage } from "./images.ts";
+import { confirmAction, saveFile, type OpenedFile } from "./platform.ts";
 
 export type Scope = { kind: "all" } | { kind: "unsorted" } | { kind: "collection"; id: string };
 export type View = "grid" | "tree";
@@ -33,28 +42,60 @@ export interface Gallery {
   title: string;
   files: TasteFileEntry[];
   index: number;
+  /** The item the files belong to, so the gallery can follow edits to them. */
+  itemId?: string;
+}
+
+/** The form that is open, if any. */
+export type Editor =
+  | { kind: "document" }
+  | { kind: "collection"; id: string | null }
+  | { kind: "item"; id: string | null }
+  | { kind: "file"; itemId: string; fileId: string };
+
+interface Step {
+  manifest: Manifest;
+  revision: number;
+  label: string;
 }
 
 const VIEW_KEY = "taste-viewer:view";
+const HISTORY_LIMIT = 100;
+const GENERATOR = `Taste Viewer ${__VIEWER_VERSION__}`;
 
 class Session {
-  file = $state.raw<TasteFile | null>(null);
+  doc = $state.raw<TasteDocument | null>(null);
+  /** The document's manifest, deeply reactive. `doc.manifest` is the same object. */
+  manifest = $state<Manifest | null>(null);
   name = $state("");
+  /** Where the document was opened from, when the platform can save back to it. */
+  handle = $state.raw<unknown>(null);
   loading = $state(false);
+  saving = $state(false);
+  /** What the app is busy with, such as reading added files, for a status message. */
+  busy = $state<string | null>(null);
   error = $state<string | null>(null);
-  problems = $state.raw<Problem[]>([]);
+  notice = $state<string | null>(null);
 
   scope = $state.raw<Scope>({ kind: "all" });
   itemId = $state<string | null>(null);
   view = $state<View>(readView());
+  editor = $state.raw<Editor | null>(null);
 
   search = $state("");
   kindFilter = $state<string | null>(null);
   tagFilter = $state.raw<[string, string] | null>(null);
   lightbox = $state.raw<Gallery | null>(null);
 
-  get manifest(): Manifest | null {
-    return this.file?.manifest ?? null;
+  undoStack = $state.raw<Step[]>([]);
+  redoStack = $state.raw<Step[]>([]);
+  private revision = $state(0);
+  private savedRevision = $state(0);
+  private nextRevision = 1;
+
+  /** Whether there are changes that have not been saved. */
+  get dirty(): boolean {
+    return this.revision !== this.savedRevision;
   }
 
   get collection(): Collection | null {
@@ -62,6 +103,10 @@ class Session {
     if (scope.kind !== "collection") return null;
     return this.manifest?.collections.find((c) => c.id === scope.id) ?? null;
   }
+
+  readonly problems: Problem[] = $derived.by(() => {
+    return this.manifest && this.doc ? this.doc.validate() : [];
+  });
 
   readonly unsortedIds: string[] = $derived.by(() => {
     return this.manifest ? unsorted(this.manifest) : [];
@@ -101,6 +146,11 @@ class Session {
     );
   });
 
+  /** Whether the rows are the whole collection in order, so they can be rearranged. */
+  get canReorder(): boolean {
+    return this.collection !== null && this.rows.length === this.scopeRows.length;
+  }
+
   /** Top-level kinds in the scope with their counts, for the kind filter. */
   readonly kinds: [string, number][] = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -133,16 +183,16 @@ class Session {
     return (this.itemId && this.manifest?.items[this.itemId]) || null;
   }
 
+  // Opening and closing
+
   async open(opened: OpenedFile): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
     this.loading = true;
     this.error = null;
     try {
-      const file = await TasteFile.open(opened.data);
-      this.close();
-      this.file = file;
-      this.name = opened.name;
-      this.problems = file.validate();
-      const first = file.manifest.collections[0];
+      const doc = await TasteDocument.open(opened.data);
+      this.adopt(doc, opened.name, opened.handle ?? null);
+      const first = doc.manifest.collections[0];
       this.go(first ? { kind: "collection", id: first.id } : { kind: "all" }, null, true);
     } catch (error) {
       this.error = `${opened.name}: ${(error as Error).message}`;
@@ -151,16 +201,212 @@ class Session {
     }
   }
 
+  /** Start a new, empty document with one collection. */
+  async create(title: string, firstCollection: string): Promise<void> {
+    if (!(await this.confirmDiscard())) return;
+    const doc = TasteDocument.create(title.trim());
+    const name = firstCollection.trim();
+    const collection = name ? doc.addCollection(name) : null;
+    this.adopt(doc, `${slugify(title) || "untitled"}.taste`, null);
+    // A document that was never saved counts as changed, so closing it asks first.
+    this.revision = this.nextRevision++;
+    this.go(collection ? { kind: "collection", id: collection.id } : { kind: "all" }, null, true);
+  }
+
+  /** Close the document, asking first when it has unsaved changes. */
+  async requestClose(): Promise<void> {
+    if (await this.confirmDiscard()) this.close();
+  }
+
+  private async confirmDiscard(): Promise<boolean> {
+    if (!this.doc || !this.dirty) return true;
+    return confirmAction(`${this.name} has unsaved changes. Discard them?`);
+  }
+
+  private adopt(doc: TasteDocument, name: string, handle: unknown): void {
+    this.close();
+    this.manifest = doc.manifest;
+    doc.manifest = this.manifest;
+    this.doc = doc;
+    this.name = name;
+    this.handle = handle;
+  }
+
   close(): void {
-    this.file?.close();
-    this.file = null;
+    this.doc?.close();
+    this.doc = null;
+    this.manifest = null;
     this.name = "";
-    this.problems = [];
+    this.handle = null;
     this.itemId = null;
     this.lightbox = null;
+    this.editor = null;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.revision = this.savedRevision = 0;
     this.clearFilters();
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
   }
+
+  // Changing the document
+
+  /**
+   * Apply a change to the document as one undoable step. If the change throws, the document is
+   * put back as it was and the error is shown.
+   */
+  edit(label: string, change: (doc: TasteDocument, manifest: Manifest) => void): boolean {
+    const doc = this.doc;
+    const manifest = this.manifest;
+    if (!doc || !manifest) return false;
+    const before = $state.snapshot(manifest) as Manifest;
+    try {
+      change(doc, manifest);
+    } catch (error) {
+      this.restore(before);
+      this.error = (error as Error).message;
+      return false;
+    }
+    this.undoStack = [...this.undoStack.slice(1 - HISTORY_LIMIT), { manifest: before, revision: this.revision, label }];
+    this.redoStack = [];
+    this.revision = this.nextRevision++;
+    this.settle();
+    return true;
+  }
+
+  undo(): void {
+    this.travel(this.undoStack, this.redoStack, (undo, redo) => {
+      this.undoStack = undo;
+      this.redoStack = redo;
+    });
+  }
+
+  redo(): void {
+    this.travel(this.redoStack, this.undoStack, (redo, undo) => {
+      this.undoStack = undo;
+      this.redoStack = redo;
+    });
+  }
+
+  private travel(from: Step[], to: Step[], update: (from: Step[], to: Step[]) => void): void {
+    const step = from.at(-1);
+    const doc = this.doc;
+    if (!step || !doc || !this.manifest) return;
+    // Saving drops files nothing refers to, so steps from before a save may need files that
+    // are gone.
+    const needed = new TasteDocument(step.manifest).referencedBlobs();
+    if ([...needed].some((ref) => !doc.hasBlob(ref))) {
+      this.error = `“${step.label}” can’t be undone: files it needs were removed when the file was saved.`;
+      return;
+    }
+    const current = { manifest: $state.snapshot(this.manifest) as Manifest, revision: this.revision, label: step.label };
+    this.restore(step.manifest);
+    update(from.slice(0, -1), [...to, current]);
+    this.revision = step.revision;
+    this.settle();
+  }
+
+  private restore(manifest: Manifest): void {
+    this.manifest = manifest;
+    if (this.doc) this.doc.manifest = this.manifest;
+  }
+
+  /** After a change, leave views of things that no longer exist. */
+  private settle(): void {
+    const manifest = this.manifest;
+    if (!manifest) return;
+    const scope = this.scope;
+    const scopeGone = scope.kind === "collection" && !manifest.collections.some((c) => c.id === scope.id);
+    const itemGone = this.itemId !== null && !manifest.items[this.itemId];
+    if (scopeGone || itemGone) {
+      this.go(scopeGone ? { kind: "all" } : scope, itemGone ? null : this.itemId, true);
+    }
+    const gallery = this.lightbox;
+    if (gallery) {
+      const files = gallery.itemId ? manifest.items[gallery.itemId]?.files ?? [] : [];
+      const kept = gallery.files.flatMap((old) => files.filter((f) => f.id === old.id));
+      const current = gallery.files[gallery.index];
+      const index = Math.max(0, kept.findIndex((f) => f.id === current?.id));
+      this.lightbox = kept.length ? { ...gallery, files: kept, index } : null;
+    }
+    const editor = this.editor;
+    if (editor?.kind === "file" && !manifest.items[editor.itemId]?.files?.some((f) => f.id === editor.fileId)) {
+      this.editor = null;
+    }
+  }
+
+  /** Store files and attach them to an item, as one step. Images get their size and a thumbnail. */
+  async addFiles(itemId: string, files: File[]): Promise<void> {
+    const doc = this.doc;
+    if (!doc || !files.length) return;
+    this.busy = files.length === 1 ? `Adding ${files[0]!.name}…` : `Adding ${files.length} files…`;
+    try {
+      const prepared: NewFile[] = [];
+      for (const file of files) {
+        const item = this.manifest?.items[itemId];
+        if (!item) return;
+        const type = await typeOf(file);
+        const image = type.startsWith("image/") ? await describeImage(file) : {};
+        const role = defaultRole(item, type, [...(item.files ?? []), ...prepared]);
+        prepared.push(await doc.fileFrom(file, { role, type, ...image }));
+      }
+      const label = prepared.length === 1 ? "Add a file" : `Add ${prepared.length} files`;
+      this.edit(label, (current) => {
+        for (const file of prepared) current.attachFile(itemId, file);
+      });
+      this.notice = `${label.replace("Add", "Added")} to ${this.manifest?.items[itemId]?.title ?? "the item"}`;
+    } catch (error) {
+      this.error = `Could not add the file: ${(error as Error).message}`;
+    } finally {
+      this.busy = null;
+    }
+  }
+
+  /** Store an image to use as a collection's cover. Resolves to the file, ready to set. */
+  async coverFrom(file: File): Promise<NewFile | null> {
+    const doc = this.doc;
+    if (!doc) return null;
+    const type = await typeOf(file);
+    if (!type.startsWith("image/")) {
+      this.error = `${file.name} is not an image.`;
+      return null;
+    }
+    return doc.fileFrom(file, { role: "cover", type, ...(await describeImage(file)) });
+  }
+
+  /**
+   * Save the document: back to its file when possible, otherwise to a place the user picks (or a
+   * download). The saved file becomes the document's source, so later saves copy from it.
+   */
+  async save(saveAs = false): Promise<void> {
+    const doc = this.doc;
+    if (!doc || !this.manifest || this.saving) return;
+    const problems = this.problems.filter((p) => !p.path.startsWith("["));
+    if (problems.length) {
+      this.error = `Can’t save while the file has ${problems.length === 1 ? "a problem" : `${problems.length} problems`}; see the list in the sidebar.`;
+      return;
+    }
+    this.saving = true;
+    this.error = null;
+    try {
+      const data = await doc.save({ generator: GENERATOR });
+      const saved = await saveFile(data, { name: this.name, handle: this.handle ?? undefined }, saveAs);
+      if (!saved) return;
+      const file = await TasteFile.open(saved.data);
+      const next = new TasteDocument(this.manifest, file);
+      this.doc = next;
+      doc.close();
+      this.name = saved.name;
+      if (saved.handle) this.handle = saved.handle;
+      this.savedRevision = this.revision;
+      this.notice = saved.handle ? `Saved ${saved.name}` : `Downloaded ${saved.name}`;
+    } catch (error) {
+      this.error = `Could not save: ${(error as Error).message}`;
+    } finally {
+      this.saving = false;
+    }
+  }
+
+  // Moving around
 
   clearFilters(): void {
     this.search = "";
@@ -195,8 +441,8 @@ class Session {
     return toHash(this.scope, itemId);
   }
 
-  showFile(title: string, files: TasteFileEntry[], file: TasteFileEntry): void {
-    this.lightbox = { title, files, index: Math.max(0, files.indexOf(file)) };
+  showFile(title: string, files: TasteFileEntry[], file: TasteFileEntry, itemId?: string): void {
+    this.lightbox = { title, files, index: Math.max(0, files.indexOf(file)), itemId };
   }
 
   openItem(itemId: string): void {
@@ -219,6 +465,11 @@ class Session {
     this.itemId = itemId && this.manifest.items[itemId] ? itemId : null;
     this.lightbox = null;
   }
+}
+
+async function typeOf(file: File): Promise<string> {
+  const type = guessType(new Uint8Array(await file.slice(0, 64).arrayBuffer()), file.name);
+  return type === "application/octet-stream" && file.type ? file.type : type;
 }
 
 function readView(): View {

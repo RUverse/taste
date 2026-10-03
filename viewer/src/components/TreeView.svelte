@@ -70,7 +70,7 @@
   {/if}
 {/snippet}
 
-{#snippet fileNode(file: TasteFileEntry, files: TasteFileEntry[], title: string)}
+{#snippet fileNode(file: TasteFileEntry, files: TasteFileEntry[], title: string, itemId?: string)}
   <li>
     <details class="tree-node tree-file">
       <summary>
@@ -87,7 +87,7 @@
       <ul role="group">
         {@render leaf("type", file.type)}
         {#if isStored(file)}
-          {@render leaf("stored", `${bytes(file.size ?? session.file?.blobSize(file.blob))} · ${shortRef(file.blob)}`)}
+          {@render leaf("stored", `${bytes(file.size ?? session.doc?.blobSize(file.blob))} · ${shortRef(file.blob)}`)}
         {:else if file.url}
           {@render leaf("url", file.url)}
         {/if}
@@ -101,7 +101,7 @@
           <button
             class="link-button"
             type="button"
-            onclick={() => session.showFile(title, files, file)}
+            onclick={() => session.showFile(title, files, file, itemId)}
           >
             View file
           </button>
@@ -174,7 +174,7 @@
             <details class="tree-node" open>
               <summary><span class="tree-key">files</span><span class="tree-count">{item.files.length}</span></summary>
               <ul role="group">
-                {#each item.files as file (file.id)}{@render fileNode(file, item.files, item.title)}{/each}
+                {#each item.files as file (file.id)}{@render fileNode(file, item.files, item.title, id)}{/each}
               </ul>
             </details>
           </li>

@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { draggedItem, endItemDrag } from "../lib/drag.ts";
   import { bytes, date, plural } from "../lib/format.ts";
-  import { chooseFile } from "../lib/platform.ts";
+  import { chooseFile, savesInPlace } from "../lib/platform.ts";
   import { session, type Scope } from "../lib/session.svelte.ts";
   import Icon from "./Icon.svelte";
   import StoredImage from "./StoredImage.svelte";
@@ -20,6 +21,32 @@
     const file = await chooseFile();
     if (file) await session.open(file);
   }
+
+  const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+  const undoLabel = $derived(session.undoStack.at(-1)?.label);
+  const redoLabel = $derived(session.redoStack.at(-1)?.label);
+  const saveLabel = savesInPlace ? "Save" : "Download";
+  let dropTarget = $state<string | null>(null);
+
+  function canDrop(event: DragEvent, collectionId: string): boolean {
+    const itemId = draggedItem(event);
+    const collection = manifest.collections.find((c) => c.id === collectionId);
+    return Boolean(itemId && collection && !collection.entries.some((e) => e.item === itemId));
+  }
+
+  function dropOn(event: DragEvent, collectionId: string) {
+    const itemId = draggedItem(event);
+    const allowed = canDrop(event, collectionId);
+    dropTarget = null;
+    endItemDrag();
+    if (!itemId || !allowed) return;
+    event.preventDefault();
+    const collection = manifest.collections.find((c) => c.id === collectionId)!;
+    const title = manifest.items[itemId]?.title ?? itemId;
+    if (session.edit(`Add “${title}” to ${collection.name}`, (doc) => doc.addEntry(collectionId, itemId))) {
+      session.notice = `Added “${title}” to ${collection.name}`;
+    }
+  }
 </script>
 
 {#if open}
@@ -30,8 +57,11 @@
   <header class="sidebar-head">
     <div class="sidebar-title">
       <h1>{manifest.title || session.name}</h1>
-      <p>{session.name} · {bytes(session.file?.size)}</p>
+      <p>{session.name}{#if session.doc?.size !== undefined} · {bytes(session.doc.size)}{/if}</p>
     </div>
+    <button class="icon-button" type="button" aria-label="Edit the title and description" title="Edit the title and description" onclick={() => (session.editor = { kind: "document" })}>
+      <Icon name="pencil" size={16} />
+    </button>
     <button class="icon-button sidebar-close" type="button" aria-label="Close collections" onclick={onclose}>
       <Icon name="close" />
     </button>
@@ -40,6 +70,27 @@
   {#if manifest.description}
     <p class="sidebar-description">{manifest.description}</p>
   {/if}
+
+  <div class="save-bar">
+    <button
+      class="button button-small"
+      class:button-primary={session.dirty}
+      type="button"
+      disabled={session.saving}
+      title="{savesInPlace ? 'Save' : 'Download the file with your changes'} ({mod}S)"
+      onclick={() => session.save()}
+    >
+      <Icon name={savesInPlace ? "save" : "download"} size={15} />
+      {session.saving ? "Saving…" : saveLabel}
+    </button>
+    <button class="icon-button" type="button" aria-label="Undo" title={undoLabel ? `Undo ${undoLabel} (${mod}Z)` : "Nothing to undo"} disabled={!undoLabel} onclick={() => session.undo()}>
+      <Icon name="undo" size={17} />
+    </button>
+    <button class="icon-button" type="button" aria-label="Redo" title={redoLabel ? `Redo ${redoLabel}` : "Nothing to redo"} disabled={!redoLabel} onclick={() => session.redo()}>
+      <Icon name="redo" size={17} />
+    </button>
+    <span class="save-state" class:unsaved={session.dirty}>{session.dirty ? "Unsaved changes" : "Saved"}</span>
+  </div>
 
   <ul class="nav-list" role="list">
     <li>
@@ -59,7 +110,12 @@
     </li>
   </ul>
 
-  <h2 class="nav-heading">Collections</h2>
+  <div class="nav-heading-row">
+    <h2 class="nav-heading">Collections</h2>
+    <button class="icon-button" type="button" aria-label="New collection" title="New collection" onclick={() => (session.editor = { kind: "collection", id: null })}>
+      <Icon name="plus" size={16} />
+    </button>
+  </div>
   {#if manifest.collections.length === 0}
     <p class="nav-empty">This file has no collections yet.</p>
   {:else}
@@ -71,11 +127,22 @@
             class="nav-link"
             href="#/c/{encodeURIComponent(collection.id)}"
             aria-current={isCurrent(scope) ? "page" : undefined}
+            class:drop-target={dropTarget === collection.id}
             title={collection.vibe}
             onclick={(event) => {
               event.preventDefault();
               session.go(scope);
             }}
+            ondragover={(event) => {
+              if (!canDrop(event, collection.id)) return;
+              event.preventDefault();
+              if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+              dropTarget = collection.id;
+            }}
+            ondragleave={() => {
+              if (dropTarget === collection.id) dropTarget = null;
+            }}
+            ondrop={(event) => dropOn(event, collection.id)}
           >
             <span class="nav-icon nav-cover">
               {#if collection.cover?.type.startsWith("image/")}
@@ -127,11 +194,17 @@
         </ul>
       </details>
     {/if}
+    {#if savesInPlace}
+      <button class="button button-quiet" type="button" onclick={() => session.save(true)}>
+        <Icon name="save" size={16} />
+        Save a copy…
+      </button>
+    {/if}
     <button class="button button-quiet" type="button" onclick={openAnother}>
       <Icon name="open" size={16} />
       Open another file
     </button>
-    <button class="button button-quiet" type="button" onclick={() => session.close()}>
+    <button class="button button-quiet" type="button" onclick={() => session.requestClose()}>
       <Icon name="close" size={16} />
       Close
     </button>

@@ -14,6 +14,7 @@ export interface ZipEntry {
   method: number;
   compressedSize: number;
   size: number;
+  crc32: number;
   /** Offset of the entry's local header. */
   offset: number;
   /** Central directory extra field length, used to check the spec's "no extra field" rule. */
@@ -103,6 +104,7 @@ export class ZipReader {
         method: directory.getUint16(p + 10, true),
         compressedSize: directory.getUint32(p + 20, true),
         size: directory.getUint32(p + 24, true),
+        crc32: directory.getUint32(p + 16, true),
         offset: directory.getUint32(p + 42, true),
         extraLength,
       };
@@ -123,6 +125,12 @@ export class ZipReader {
     const end = start + entry.compressedSize;
     if (entry.method === STORED) return this.source.slice(start, end, type);
     return new Blob([await this.bytes(entry)], { type });
+  }
+
+  /** The entry's data exactly as stored, still compressed if it is, for copying it unchanged. */
+  async raw(entry: ZipEntry): Promise<Blob> {
+    const start = await this.dataStart(entry);
+    return this.source.slice(start, start + entry.compressedSize);
   }
 
   async bytes(entry: ZipEntry): Promise<Uint8Array<ArrayBuffer>> {

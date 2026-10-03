@@ -1,5 +1,6 @@
 <script lang="ts">
   import Browse from "./components/Browse.svelte";
+  import Editors from "./components/Editors.svelte";
   import ItemPanel from "./components/ItemPanel.svelte";
   import Lightbox from "./components/Lightbox.svelte";
   import Sidebar from "./components/Sidebar.svelte";
@@ -9,6 +10,8 @@
   import { session } from "./lib/session.svelte.ts";
 
   let dragging = $state(false);
+  /** Over a part of the page that takes dropped files itself, such as the item panel. */
+  let overDropzone = $state(false);
   let dragDepth = 0;
   let sidebarOpen = $state(false);
 
@@ -30,15 +33,18 @@
 
   function onDragOver(event: DragEvent) {
     if (!hasFiles(event)) return;
+    overDropzone = Boolean((event.target as Element | null)?.closest?.("[data-dropzone]"));
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
   }
 
   function onDrop(event: DragEvent) {
     if (!hasFiles(event)) return;
-    event.preventDefault();
     dragDepth = 0;
     dragging = false;
+    // A drop zone inside the page (the item panel) already took the files.
+    if (event.defaultPrevented) return;
+    event.preventDefault();
     const file = droppedFile(event);
     if (file) session.open(file);
   }
@@ -50,13 +56,45 @@
   });
 
   $effect(() => {
-    document.title = session.manifest
-      ? `${session.manifest.title || session.name} · Taste Viewer`
-      : "Taste Viewer";
+    const name = session.manifest ? `${session.manifest.title || session.name}` : "";
+    document.title = name ? `${session.dirty ? "• " : ""}${name} · Taste Viewer` : "Taste Viewer";
   });
+
+  $effect(() => {
+    // Short confirmations go away by themselves.
+    if (!session.notice) return;
+    const timer = setTimeout(() => (session.notice = null), 3500);
+    return () => clearTimeout(timer);
+  });
+
+  function onKeydown(event: KeyboardEvent) {
+    if (!session.manifest || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "s") {
+      event.preventDefault();
+      session.save(event.shiftKey);
+      return;
+    }
+    // Text fields and open forms keep their own undo.
+    const target = event.target instanceof Element ? event.target : null;
+    if (session.editor || target?.closest("input, textarea, select, [contenteditable]")) return;
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      session.undo();
+    } else if ((key === "z" && event.shiftKey) || key === "y") {
+      event.preventDefault();
+      session.redo();
+    }
+  }
+
+  function onBeforeUnload(event: BeforeUnloadEvent) {
+    if (session.manifest && session.dirty) event.preventDefault();
+  }
 </script>
 
 <svelte:window
+  onkeydown={onKeydown}
+  onbeforeunload={onBeforeUnload}
   onhashchange={() => session.readHash()}
   onpopstate={() => session.readHash()}
   ondragenter={onDragEnter}
@@ -87,16 +125,24 @@
     {/if}
   </div>
   <Lightbox />
+  <Editors />
 {:else}
   <Welcome />
 {/if}
 
-{#if dragging}
+{#if dragging && !overDropzone}
   <div class="drop-overlay" aria-hidden="true">
     <div class="drop-overlay-card">
       <Icon name="open" size={28} />
       <p>Drop a <strong>.taste</strong> file to open it</p>
     </div>
+  </div>
+{/if}
+
+{#if session.manifest && (session.busy || session.notice) && !session.error}
+  <div class="toast toast-info" role="status">
+    <Icon name={session.busy ? "paperclip" : "check"} />
+    <span>{session.busy ?? session.notice}</span>
   </div>
 {/if}
 

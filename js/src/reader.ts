@@ -12,6 +12,15 @@ export class TasteError extends Error {
   override name = "TasteError";
 }
 
+export interface RawBlob {
+  /** The stored bytes: compressed when `method` is not `STORED`. */
+  data: Blob;
+  method: number;
+  /** Uncompressed size. */
+  size: number;
+  crc32: number;
+}
+
 export interface OpenOptions {
   /** Open files whose format version this reader does not know. */
   anyVersion?: boolean;
@@ -103,6 +112,21 @@ export class TasteFile {
     const entry = this.blobEntries.get(ref);
     if (!entry) throw new TasteError(`blob not in file: ${ref}`);
     return this.zip.blob(entry, type);
+  }
+
+  /**
+   * A blob exactly as it is stored in the archive, still compressed if it is, so a writer can
+   * copy it without reading it.
+   */
+  async rawBlob(ref: string): Promise<RawBlob> {
+    const entry = this.blobEntries.get(ref);
+    if (!entry) throw new TasteError(`blob not in file: ${ref}`);
+    return {
+      data: await this.zip.raw(entry),
+      method: entry.method,
+      size: entry.size,
+      crc32: entry.crc32,
+    };
   }
 
   async text(ref: string): Promise<string> {

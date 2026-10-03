@@ -21,6 +21,7 @@
     serviceName,
   } from "../lib/format.ts";
   import { kindStyle } from "../lib/kinds.ts";
+  import { chooseAttachments } from "../lib/platform.ts";
   import { session } from "../lib/session.svelte.ts";
   import Icon from "./Icon.svelte";
   import MetaValue from "./MetaValue.svelte";
@@ -48,7 +49,15 @@
   const previous = $derived(position > 0 ? session.rows[position - 1] : undefined);
   const next = $derived(position >= 0 ? session.rows[position + 1] : undefined);
 
+  const otherCollections = $derived(
+    manifest.collections.filter((c) => !places.some((place) => place.collection.id === c.id)),
+  );
+  const entryIndex = $derived(
+    session.collection ? session.collection.entries.findIndex((e) => e.item === itemId) : -1,
+  );
+
   let heading: HTMLHeadingElement | undefined = $state();
+  let dropping = $state(false);
 
   $effect(() => {
     heading?.focus({ preventScroll: true });
@@ -56,13 +65,62 @@
 
   function show(file: TasteFileEntry) {
     const gallery = [...(hero ? [hero] : []), ...images, ...others];
-    session.showFile(item.title, gallery, file);
+    session.showFile(item.title, gallery, file, itemId);
+  }
+
+  async function addFiles() {
+    const files = await chooseAttachments();
+    await session.addFiles(itemId, files);
+  }
+
+  function addTo(collectionId: string) {
+    const collection = manifest.collections.find((c) => c.id === collectionId);
+    if (!collection) return;
+    session.edit(`Add “${item.title}” to ${collection.name}`, (doc) => doc.addEntry(collectionId, itemId));
+  }
+
+  function removeFrom(collectionId: string, name: string) {
+    session.edit(`Remove “${item.title}” from ${name}`, (doc) => doc.removeEntry(collectionId, itemId));
+  }
+
+  function move(delta: number) {
+    const collection = session.collection;
+    if (!collection || entryIndex < 0) return;
+    session.edit(`Move “${item.title}”`, (doc) => doc.moveEntry(collection.id, itemId, entryIndex + delta));
+  }
+
+  function hasFiles(event: DragEvent): boolean {
+    return event.dataTransfer?.types.includes("Files") ?? false;
+  }
+
+  function onDragOver(event: DragEvent) {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    dropping = true;
+  }
+
+  function onDrop(event: DragEvent) {
+    if (!hasFiles(event)) return;
+    // Marks the drop as handled, so the window does not open a dropped .taste file as well.
+    event.preventDefault();
+    dropping = false;
+    session.addFiles(itemId, [...(event.dataTransfer?.files ?? [])]);
+  }
+
+  function onPaste(event: ClipboardEvent) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (session.editor || target?.closest("input, textarea, [contenteditable]")) return;
+    const files = [...(event.clipboardData?.files ?? [])];
+    if (!files.length) return;
+    event.preventDefault();
+    session.addFiles(itemId, files);
   }
 
   function onKeydown(event: KeyboardEvent) {
-    if (session.lightbox || event.defaultPrevented) return;
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("input, textarea, select, [contenteditable]")) return;
+    if (session.lightbox || session.editor || event.defaultPrevented) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("input, textarea, select, [contenteditable], dialog")) return;
     if (event.key === "Escape") {
       event.preventDefault();
       session.closeItem();
@@ -74,7 +132,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKeydown} />
+<svelte:window onkeydown={onKeydown} onpaste={onPaste} />
 
 {#snippet fileTile(file: TasteFileEntry)}
   <li>
@@ -94,7 +152,17 @@
   </li>
 {/snippet}
 
-<aside class="panel" aria-labelledby="panel-title">
+<aside
+  class="panel"
+  class:dropping
+  aria-labelledby="panel-title"
+  data-dropzone
+  ondragover={onDragOver}
+  ondragleave={(event) => {
+    if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) dropping = false;
+  }}
+  ondrop={onDrop}
+>
   <header class="panel-bar">
     <button class="icon-button" type="button" aria-label="Previous item" title="Previous (←)" disabled={!previous} onclick={() => previous && session.openItem(previous.id)}>
       <Icon name="left" />
@@ -103,6 +171,9 @@
       <Icon name="right" />
     </button>
     <span class="panel-position">{#if position >= 0}{position + 1} of {session.rows.length}{/if}</span>
+    <button class="icon-button" type="button" aria-label="Edit item" title="Edit" onclick={() => (session.editor = { kind: "item", id: itemId })}>
+      <Icon name="pencil" />
+    </button>
     <button class="icon-button" type="button" aria-label="Close details" title="Close (Esc)" onclick={() => session.closeItem()}>
       <Icon name="close" />
     </button>
@@ -143,15 +214,29 @@
       </ul>
     {/if}
 
-    {#if places.length}
+    {#if places.length || otherCollections.length}
       <section class="panel-section">
-        <h3>In {places.length === 1 ? "collection" : "collections"}</h3>
+        <h3>{places.length === 1 ? "In collection" : places.length ? "In collections" : "In no collection yet"}</h3>
         <ul class="place-list" role="list">
           {#each places as { collection, entry } (collection.id)}
-            <li class="place" class:current={collection.id === session.collection?.id}>
-              <button class="link-button place-name" type="button" onclick={() => session.go({ kind: "collection", id: collection.id }, itemId)}>
-                {collection.name}
-              </button>
+            {@const current = collection.id === session.collection?.id}
+            <li class="place" class:current>
+              <div class="place-head">
+                <button class="link-button place-name" type="button" onclick={() => session.go({ kind: "collection", id: collection.id }, itemId)}>
+                  {collection.name}
+                </button>
+                {#if current}
+                  <button class="icon-button icon-button-small" type="button" aria-label="Move earlier in {collection.name}" title="Move earlier" disabled={entryIndex <= 0} onclick={() => move(-1)}>
+                    <Icon name="up" size={15} />
+                  </button>
+                  <button class="icon-button icon-button-small" type="button" aria-label="Move later in {collection.name}" title="Move later" disabled={entryIndex < 0 || entryIndex >= collection.entries.length - 1} onclick={() => move(1)}>
+                    <Icon name="down" size={15} />
+                  </button>
+                {/if}
+                <button class="icon-button icon-button-small" type="button" aria-label="Remove from {collection.name}" title="Remove from {collection.name}" onclick={() => removeFrom(collection.id, collection.name)}>
+                  <Icon name="close" size={15} />
+                </button>
+              </div>
               {#if entry.note}<p class="place-note">“{entry.note}”</p>{/if}
               {#if entry.added_by?.type === "agent"}
                 <p class="place-agent">
@@ -162,6 +247,25 @@
             </li>
           {/each}
         </ul>
+        {#if otherCollections.length}
+          <label class="add-to">
+            <span class="sr-only">Add to a collection</span>
+            <select
+              class="input input-small"
+              value=""
+              onchange={(event) => {
+                const select = event.currentTarget;
+                if (select.value) addTo(select.value);
+                select.value = "";
+              }}
+            >
+              <option value="" disabled>Add to a collection…</option>
+              {#each otherCollections as collection (collection.id)}
+                <option value={collection.id}>{collection.name}</option>
+              {/each}
+            </select>
+          </label>
+        {/if}
       </section>
     {/if}
 
@@ -185,15 +289,28 @@
       </section>
     {/if}
 
-    {#if images.length || others.length}
-      <section class="panel-section">
+    <section class="panel-section">
+      <div class="section-head">
         <h3>Files</h3>
+        <button class="button button-small" type="button" disabled={session.busy !== null} onclick={addFiles}>
+          <Icon name="paperclip" size={14} /> Add
+        </button>
+      </div>
+      {#if images.length || others.length}
         <ul class="file-grid" role="list">
           {#each images as file (file.id)}{@render fileTile(file)}{/each}
           {#each others as file (file.id)}{@render fileTile(file)}{/each}
         </ul>
-      </section>
-    {/if}
+      {:else if !hero}
+        <button class="file-drop" type="button" onclick={addFiles}>
+          <Icon name="image" size={22} />
+          <span>Add a poster, screenshots, or other files</span>
+          <span class="muted">or drop or paste them here</span>
+        </button>
+      {:else}
+        <p class="field-hint">Drop or paste screenshots here to add them.</p>
+      {/if}
+    </section>
 
     {#if children.length}
       <section class="panel-section">

@@ -9,6 +9,15 @@
     if (file) await session.open(file);
   }
 
+  let creating = $state(false);
+  let title = $state("");
+  let firstCollection = $state("");
+
+  async function create(event: SubmitEvent) {
+    event.preventDefault();
+    await session.create(title, firstCollection);
+  }
+
   async function openSample() {
     try {
       await session.open(await fetchFile(sampleUrl, "moods.taste"));
@@ -36,11 +45,30 @@
         <Icon name="open" />
         Open a file
       </button>
+      <button class="button" type="button" onclick={() => (creating = !creating)} aria-expanded={creating}>
+        <Icon name="plus" />
+        New file
+      </button>
       <button class="button" type="button" onclick={openSample} disabled={session.loading}>
         <Icon name="sparkle" />
         Try the sample
       </button>
     </div>
+
+    {#if creating}
+      <form class="welcome-new" onsubmit={create}>
+        <label class="field">
+          <span class="field-label">Title</span>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input class="input" autofocus placeholder="My moods" bind:value={title} />
+        </label>
+        <label class="field">
+          <span class="field-label">First collection</span>
+          <input class="input" placeholder="Rainy Sunday" bind:value={firstCollection} />
+        </label>
+        <button class="button button-primary" type="submit">Create</button>
+      </form>
+    {/if}
     <p class="welcome-hint">or drop a file anywhere on this page</p>
 
     {#if session.loading}

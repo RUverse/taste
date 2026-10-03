@@ -50,7 +50,7 @@
   }
 
   $effect(() => {
-    const doc = session.file;
+    const doc = session.doc;
     const target = file;
     failed = false;
     if (!visible || !doc) return;

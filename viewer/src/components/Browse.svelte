@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tagPairs } from "@ruverse/taste";
+  import { draggedItem, endItemDrag, startItemDrag } from "../lib/drag.ts";
   import { plural } from "../lib/format.ts";
   import { kindStyle } from "../lib/kinds.ts";
   import { session } from "../lib/session.svelte.ts";
@@ -34,6 +35,49 @@
         : [key, value];
   }
 
+  /** Where a dragged card would land: before or after another card. */
+  let drop = $state<{ id: string; after: boolean } | null>(null);
+
+  function cellOf(event: DragEvent): HTMLElement | null {
+    return event.target instanceof Element ? event.target.closest<HTMLElement>("[data-item]") : null;
+  }
+
+  function onDragStart(event: DragEvent) {
+    const cell = cellOf(event);
+    if (cell?.dataset.item) startItemDrag(event, cell.dataset.item);
+  }
+
+  function onDragOver(event: DragEvent) {
+    const dragged = draggedItem(event);
+    const cell = cellOf(event);
+    if (!dragged || !cell?.dataset.item || !session.canReorder) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    const box = cell.getBoundingClientRect();
+    const target = { id: cell.dataset.item, after: event.clientX > box.left + box.width / 2 };
+    if (target.id === dragged) drop = null;
+    else if (drop?.id !== target.id || drop.after !== target.after) drop = target;
+  }
+
+  function onDrop(event: DragEvent) {
+    const dragged = draggedItem(event);
+    const target = drop;
+    const collection = session.collection;
+    drop = null;
+    endItemDrag();
+    if (!dragged || !target || !collection || !session.canReorder) return;
+    event.preventDefault();
+    const order = collection.entries.map((e) => e.item).filter((id) => id !== dragged);
+    const position = order.indexOf(target.id) + (target.after ? 1 : 0);
+    const title = session.manifest?.items[dragged]?.title ?? dragged;
+    session.edit(`Move “${title}”`, (doc) => doc.moveEntry(collection.id, dragged, position));
+  }
+
+  function onDragEnd() {
+    drop = null;
+    endItemDrag();
+  }
+
   function isTagActive(key: string, value: string): boolean {
     const current = session.tagFilter;
     return Boolean(
@@ -44,7 +88,14 @@
 
 <header class="browse-head">
   <div class="browse-title">
-    <h2>{heading}</h2>
+    <div class="browse-heading">
+      <h2>{heading}</h2>
+      {#if collection}
+        <button class="icon-button" type="button" aria-label="Edit collection" title="Edit collection" onclick={() => (session.editor = { kind: "collection", id: collection.id })}>
+          <Icon name="pencil" size={17} />
+        </button>
+      {/if}
+    </div>
     {#if intro}<p class="browse-vibe">{intro}</p>{/if}
     {#if collection?.description}<p class="browse-description">{collection.description}</p>{/if}
     <p class="browse-meta">
@@ -91,6 +142,11 @@
     </div>
   {/if}
 
+  <button class="button button-small add-button" type="button" aria-label="Add item" onclick={() => (session.editor = { kind: "item", id: null })}>
+    <Icon name="plus" size={15} />
+    <span>Add item</span>
+  </button>
+
   <div class="segmented view-toggle" role="group" aria-label="View">
     <button type="button" aria-pressed={session.view === "grid"} onclick={() => session.setView("grid")}>
       <Icon name="grid" size={15} />
@@ -123,9 +179,16 @@
 {#if session.view === "tree"}
   <TreeView />
 {:else if session.rows.length}
-  <ul class="card-grid" role="list">
+  <ul
+    class="card-grid"
+    role="list"
+    ondragstart={onDragStart}
+    ondragover={onDragOver}
+    ondrop={onDrop}
+    ondragend={onDragEnd}
+  >
     {#each session.rows as row (row.id)}
-      <ItemCard {row} />
+      <ItemCard {row} drop={drop?.id === row.id ? (drop.after ? "after" : "before") : null} />
     {/each}
   </ul>
 {:else}
@@ -134,7 +197,10 @@
       <p>Nothing here matches.</p>
       <button class="button" type="button" onclick={() => session.clearFilters()}>Clear filters</button>
     {:else}
-      <p>This collection is empty.</p>
+      <p>{collection ? "This collection is empty." : "Nothing here yet."}</p>
+      <button class="button" type="button" onclick={() => (session.editor = { kind: "item", id: null })}>
+        <Icon name="plus" size={16} /> Add an item
+      </button>
     {/if}
   </div>
 {/if}

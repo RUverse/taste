@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatAt, isStored, tagPairs, type TasteFileEntry } from "@ruverse/taste";
+  import { extensionFor, formatAt, isStored, tagPairs, type TasteFileEntry } from "@ruverse/taste";
   import { actorLabel, bytes, fieldLabel, safeUrl } from "../lib/format.ts";
   import { download } from "../lib/platform.ts";
   import { session } from "../lib/session.svelte.ts";
@@ -35,7 +35,7 @@
 
   $effect(() => {
     const entry = file;
-    const doc = session.file;
+    const doc = session.doc;
     mediaUrl = undefined;
     text = undefined;
     loadError = undefined;
@@ -77,25 +77,10 @@
   }
 
   async function save() {
-    const doc = session.file;
+    const doc = session.doc;
     if (!doc || !file || !isStored(file)) return;
-    const name = file.name ?? `${file.id}${extension(file.type)}`;
+    const name = file.name ?? `${file.id}${extensionFor(file.type)}`;
     download(await doc.blob(file.blob, file.type), name);
-  }
-
-  function extension(type: string): string {
-    const known: Record<string, string> = {
-      "image/jpeg": ".jpg",
-      "image/png": ".png",
-      "image/webp": ".webp",
-      "image/gif": ".gif",
-      "text/markdown": ".md",
-      "text/plain": ".txt",
-      "application/pdf": ".pdf",
-      "audio/mpeg": ".mp3",
-      "video/mp4": ".mp4",
-    };
-    return known[type] ?? "";
   }
 
   function onKeydown(event: KeyboardEvent) {
@@ -122,6 +107,12 @@
       </p>
       {#if gallery.files.length > 1}
         <span class="lightbox-count">{gallery.index + 1} / {gallery.files.length}</span>
+      {/if}
+      {#if gallery.itemId}
+        {@const itemId = gallery.itemId}
+        <button class="icon-button" type="button" aria-label="Edit file" title="Edit" onclick={() => (session.editor = { kind: "file", itemId, fileId: file.id })}>
+          <Icon name="pencil" />
+        </button>
       {/if}
       {#if isStored(file)}
         <button class="icon-button" type="button" aria-label="Download" title="Download" onclick={save}>
@@ -181,7 +172,7 @@
       <p class="lightbox-facts">
         <span>{file.type}</span>
         {#if file.width && file.height}<span>{file.width} × {file.height}</span>{/if}
-        {#if isStored(file)}<span>{bytes(file.size ?? session.file?.blobSize(file.blob))}</span>{/if}
+        {#if isStored(file)}<span>{bytes(file.size ?? session.doc?.blobSize(file.blob))}</span>{/if}
         {#if file.name}<span>{file.name}</span>{/if}
         {#if file.added_by}<span>added by {actorLabel(file.added_by)}</span>{/if}
         {#each tagPairs(file.tags) as [key, value], index (index)}<span class="tag"><span class="tag-key">{key}</span>{value}</span>{/each}

@@ -25,8 +25,8 @@ export interface At {
   [extra: string]: unknown;
 }
 
-export interface TasteFileEntry {
-  id: string;
+/** A file's description without its id, as it is before being attached to something. */
+export interface FileFields {
   role: string;
   blob?: BlobRef;
   url?: string;
@@ -43,6 +43,10 @@ export interface TasteFileEntry {
   added?: string;
   added_by?: Actor;
   [extra: string]: unknown;
+}
+
+export interface TasteFileEntry extends FileFields {
+  id: string;
 }
 
 export interface Link {

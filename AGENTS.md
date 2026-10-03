@@ -17,12 +17,15 @@ never commit or push directly to `dev` or `main`; `main` only receives releases 
 - `python/src/taste/` — reference library: `container.py` (ZIP reading, atomic writes),
   `validate.py` (schema and section 5 rules), `document.py` (the `Taste` editing API),
   `media.py` (type detection, image sizes and thumbnails via optional Pillow), `cli.py`.
-- `js/src/` — `@ruverse/taste`, the TypeScript reader: `zip.ts` (lazy ZIP reading over a Blob),
-  `reader.ts` (`TasteFile`), `validate.ts` (a port of the Python validator), `query.ts` (helpers
-  shared by viewers), `types.ts`.
+- `js/src/` — `@ruverse/taste`, TypeScript reading and editing: `zip.ts` (lazy ZIP reading over a
+  Blob), `zipwrite.ts` (ZIP writing, ZIP64 when needed), `reader.ts` (`TasteFile`), `document.ts`
+  (`TasteDocument`, the editing API that follows the Python `Taste` class), `media.ts` (type
+  detection), `validate.ts` (a port of the Python validator), `query.ts` (helpers shared by
+  viewers), `types.ts`.
 - `viewer/` — Taste Viewer (Svelte 5, Vite, Bun). File access goes only through
   `src/lib/platform.ts`, so the planned Tauri desktop builds can swap in native implementations;
-  keep it that way. App state is in `src/lib/session.svelte.ts`.
+  keep it that way. App state is in `src/lib/session.svelte.ts`; every change to a document goes
+  through `session.edit()`, which records undo steps.
 
 ## Rules
 

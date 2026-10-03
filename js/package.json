@@ -1,7 +1,7 @@
 {
   "name": "@ruverse/taste",
   "version": "0.1.0",
-  "description": "Read .taste files in browsers, Bun, Node, and desktop webviews.",
+  "description": "Read and edit .taste files in browsers, Bun, Node, and desktop webviews.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

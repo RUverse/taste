@@ -2,7 +2,7 @@
   "name": "@ruverse/taste-viewer",
   "version": "0.1.0",
   "private": true,
-  "description": "Open and browse .taste files.",
+  "description": "Open, browse, and edit .taste files.",
   "license": "MIT",
   "type": "module",
   "scripts": {

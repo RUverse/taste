@@ -22,8 +22,8 @@ moods.taste
 | --- | --- |
 | [`spec/`](spec/) | [The specification](spec/SPEC.md), the [JSON Schema](spec/taste.schema.json), a [sample file](spec/examples/moods.taste), and shared [conformance fixtures](spec/fixtures/) |
 | [`python/`](python/) | Reference library and the `taste` command |
-| [`js/`](js/) | `@ruverse/taste`: a TypeScript reader for browsers, Bun, Node, and desktop webviews |
-| [`viewer/`](viewer/) | Taste Viewer, a Svelte app that opens `.taste` files (desktop apps planned) |
+| [`js/`](js/) | `@ruverse/taste`: TypeScript reading and editing for browsers, Bun, Node, and desktop webviews |
+| [`viewer/`](viewer/) | Taste Viewer, a Svelte app that opens and edits `.taste` files (desktop apps planned) |
 
 The Python and TypeScript implementations are checked against the same fixtures in
 `spec/fixtures/`, including the exact location of every reported problem.

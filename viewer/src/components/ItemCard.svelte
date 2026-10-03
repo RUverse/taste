@@ -6,7 +6,7 @@
   import Icon from "./Icon.svelte";
   import StoredImage from "./StoredImage.svelte";
 
-  let { row }: { row: Row } = $props();
+  let { row, drop = null }: { row: Row; drop?: "before" | "after" | null } = $props();
 
   const item = $derived(row.item);
   const style = $derived(kindStyle(item.kind));
@@ -25,7 +25,13 @@
   let broken = $state(false);
 </script>
 
-<li class="card-cell" style:--aspect={aspect}>
+<li
+  class="card-cell"
+  class:drop-before={drop === "before"}
+  class:drop-after={drop === "after"}
+  style:--aspect={aspect}
+  data-item={row.id}
+>
   <a
     class="card"
     class:selected

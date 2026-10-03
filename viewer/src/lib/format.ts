@@ -70,6 +70,9 @@ const SERVICES: Record<string, string> = {
   kindle: "Kindle",
 };
 
+/** Service ids with known names, offered when someone adds where to find an item. */
+export const KNOWN_SERVICES = Object.keys(SERVICES);
+
 export function serviceName(service: string): string {
   return SERVICES[service] ?? fieldLabel(service);
 }

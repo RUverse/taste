@@ -91,6 +91,11 @@ with Taste.open("moods.taste") as doc:
 Saving rewrites the file in one step (a temporary file renamed over the original), so an
 interrupted save never leaves a damaged file, and stored files that nothing refers to are dropped.
 
+## Contributing
+
+Branches come from `dev` and pull requests go back to `dev`; see
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the checks to run.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

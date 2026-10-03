@@ -4,6 +4,9 @@ This repository defines the `.taste` file format and its implementations. Read `
 `spec/SPEC.md` before changing behavior. Machine-specific notes belong in an untracked
 `AGENTS.local.md`; read it when present.
 
+Git workflow (see `CONTRIBUTING.md`): branch from `dev`, open pull requests against `dev`, and
+never commit or push directly to `dev` or `main`; `main` only receives releases merged from `dev`.
+
 ## Layout
 
 - `spec/SPEC.md` — the format. It is the source of truth; implementations follow it.

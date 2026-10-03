@@ -1,0 +1,26 @@
+{
+  "description": "A file has exactly one of blob and url",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/files/0"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "files": [
+          {
+            "id": "f",
+            "role": "poster",
+            "type": "image/png",
+            "url": "https://x",
+            "blob": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      }
+    }
+  }
+}

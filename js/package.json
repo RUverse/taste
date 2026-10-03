@@ -1,0 +1,22 @@
+{
+  "name": "@ruverse/taste",
+  "version": "0.1.0",
+  "description": "Read .taste files in browsers, Bun, Node, and desktop webviews.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Regions are two capital letters",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/availability/0/region"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "availability": [
+          {
+            "service": "netflix",
+            "region": "de"
+          }
+        ]
+      }
+    }
+  }
+}

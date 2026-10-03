@@ -1,0 +1,22 @@
+{
+  "description": "Entries must point at an existing item",
+  "schema_catches": false,
+  "problems": [
+    "/collections/0/entries/0/item"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [
+      {
+        "id": "c",
+        "name": "C",
+        "entries": [
+          {
+            "item": "nope"
+          }
+        ]
+      }
+    ],
+    "items": {}
+  }
+}

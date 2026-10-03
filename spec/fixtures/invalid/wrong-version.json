@@ -1,0 +1,12 @@
+{
+  "description": "Version 9.0 is not 0.1",
+  "schema_catches": true,
+  "problems": [
+    "/taste"
+  ],
+  "manifest": {
+    "taste": "9.0",
+    "collections": [],
+    "items": {}
+  }
+}

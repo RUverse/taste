@@ -1,0 +1,17 @@
+{
+  "description": "Item id with a space",
+  "schema_catches": true,
+  "problems": [
+    "/items/a b"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a b": {
+        "kind": "movie",
+        "title": "A"
+      }
+    }
+  }
+}

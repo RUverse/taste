@@ -1,0 +1,30 @@
+{
+  "description": "show lists file ids of the entry's item",
+  "schema_catches": false,
+  "problems": [
+    "/collections/0/entries/0/show/0"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [
+      {
+        "id": "c",
+        "name": "C",
+        "entries": [
+          {
+            "item": "a",
+            "show": [
+              "nope"
+            ]
+          }
+        ]
+      }
+    ],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A"
+      }
+    }
+  }
+}

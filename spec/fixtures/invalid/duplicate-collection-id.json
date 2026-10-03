@@ -1,0 +1,23 @@
+{
+  "description": "Collection ids are unique",
+  "schema_catches": false,
+  "problems": [
+    "/collections/1/id"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [
+      {
+        "id": "c",
+        "name": "C",
+        "entries": []
+      },
+      {
+        "id": "c",
+        "name": "D",
+        "entries": []
+      }
+    ],
+    "items": {}
+  }
+}

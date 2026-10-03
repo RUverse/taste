@@ -1,0 +1,4 @@
+{
+  "description": "The smallest valid manifest",
+  "manifest": { "taste": "0.1", "collections": [], "items": {} }
+}

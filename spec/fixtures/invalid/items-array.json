@@ -1,0 +1,12 @@
+{
+  "description": "items must be an object",
+  "schema_catches": true,
+  "problems": [
+    "/items"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": []
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "description": "Kinds are lowercase dotted names",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/kind"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "Movie",
+        "title": "A"
+      }
+    }
+  }
+}

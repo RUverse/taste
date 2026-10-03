@@ -1,0 +1,18 @@
+{
+  "description": "parent must exist",
+  "schema_catches": false,
+  "problems": [
+    "/items/a/parent"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "parent": "nope"
+      }
+    }
+  }
+}

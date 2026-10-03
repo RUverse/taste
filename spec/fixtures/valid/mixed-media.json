@@ -1,0 +1,62 @@
+{
+  "description": "Two collections sharing an item, remote and stored files, an episode with a parent, unknown kind and extension fields",
+  "manifest": {
+    "taste": "0.1",
+    "title": "Sample",
+    "created": "2026-10-03T12:00:00Z",
+    "modified": "2026-10-03",
+    "x-viewer": { "theme": "dark" },
+    "collections": [
+      {
+        "id": "rainy-sunday",
+        "name": "Rainy Sunday",
+        "vibe": "Quiet and grey.",
+        "tags": { "mood": ["calm", "cozy"], "rating": 4.5, "public": false },
+        "cover": { "id": "cover", "role": "cover", "url": "https://example.com/c.jpg", "type": "image/jpeg" },
+        "entries": [
+          { "item": "film", "note": "Window scene.", "show": ["shot-1"] },
+          { "item": "ep", "added_by": { "type": "agent", "name": "hermes" }, "reason": "Same rain." }
+        ]
+      },
+      { "id": "empty", "name": "Empty", "entries": [] },
+      { "id": "neon", "name": "Neon", "entries": [{ "item": "film" }] }
+    ],
+    "items": {
+      "film": {
+        "kind": "movie",
+        "title": "A Film",
+        "year": 2003,
+        "ids": { "tmdb": 153, "imdb": "tt0335266" },
+        "meta": { "anything": [1, { "nested": true }] },
+        "links": [{ "url": "https://example.com", "label": "Home" }],
+        "availability": [{ "service": "netflix", "region": "DE", "type": "subscription", "checked": "2026-10-01" }],
+        "files": [
+          {
+            "id": "shot-1",
+            "role": "screenshot",
+            "blob": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            "thumb": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "type": "image/png",
+            "size": 10,
+            "width": 1920,
+            "height": 800,
+            "at": { "time": "00:23:41.250" },
+            "caption": "A window."
+          },
+          { "id": "poster", "role": "poster", "url": "https://example.com/p.jpg", "type": "image/jpeg" }
+        ],
+        "tags": { "watched": true, "rating": 5 }
+      },
+      "show": { "kind": "tv", "title": "A Show" },
+      "ep": {
+        "kind": "tv.episode",
+        "title": "Episode 3",
+        "parent": "show",
+        "files": [
+          { "id": "s", "role": "screenshot", "url": "https://example.com/s.png", "type": "image/png", "at": { "season": 1, "episode": 3, "time": "0:41:05" } }
+        ]
+      },
+      "thing": { "kind": "x-custom.widget", "title": "Unknown kind is fine", "x-extra": 1 }
+    }
+  }
+}

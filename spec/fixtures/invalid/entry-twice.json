@@ -1,0 +1,30 @@
+{
+  "description": "An item appears once per collection",
+  "schema_catches": false,
+  "problems": [
+    "/collections/0/entries/1/item"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [
+      {
+        "id": "c",
+        "name": "C",
+        "entries": [
+          {
+            "item": "a"
+          },
+          {
+            "item": "a"
+          }
+        ]
+      }
+    ],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A"
+      }
+    }
+  }
+}

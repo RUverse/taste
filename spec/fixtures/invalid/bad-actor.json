@@ -1,0 +1,20 @@
+{
+  "description": "added_by type is user or agent",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/added_by"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "added_by": {
+          "type": "robot"
+        }
+      }
+    }
+  }
+}

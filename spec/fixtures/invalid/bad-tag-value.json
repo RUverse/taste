@@ -1,0 +1,22 @@
+{
+  "description": "Tag values cannot be objects",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/tags/x"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "tags": {
+          "x": {
+            "y": 1
+          }
+        }
+      }
+    }
+  }
+}

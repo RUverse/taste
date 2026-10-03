@@ -1,0 +1,31 @@
+{
+  "description": "File ids are unique within an item",
+  "schema_catches": false,
+  "problems": [
+    "/items/a/files/1/id"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "files": [
+          {
+            "id": "f",
+            "role": "poster",
+            "type": "image/png",
+            "url": "https://x"
+          },
+          {
+            "id": "f",
+            "role": "screenshot",
+            "type": "image/png",
+            "url": "https://y"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "description": "at.time looks like HH:MM:SS",
+  "schema_catches": true,
+  "problems": [
+    "/items/a/files/0/at/time"
+  ],
+  "manifest": {
+    "taste": "0.1",
+    "collections": [],
+    "items": {
+      "a": {
+        "kind": "movie",
+        "title": "A",
+        "files": [
+          {
+            "id": "f",
+            "role": "screenshot",
+            "type": "image/png",
+            "url": "https://x",
+            "at": {
+              "time": "23 min"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

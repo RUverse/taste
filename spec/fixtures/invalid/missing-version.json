@@ -1,0 +1,11 @@
+{
+  "description": "No taste version",
+  "schema_catches": true,
+  "problems": [
+    "/taste"
+  ],
+  "manifest": {
+    "collections": [],
+    "items": {}
+  }
+}

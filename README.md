@@ -24,6 +24,7 @@ moods.taste
 | [`python/`](python/) | Reference library and the `taste` command |
 | [`js/`](js/) | `@ruverse/taste`: a TypeScript reader for browsers, Bun, Node, and desktop webviews |
 | [`viewer/`](viewer/) | Taste Viewer, a Svelte app that opens `.taste` files (desktop apps planned) |
+| [`skills/`](skills/) | Agent skills that teach AI agents to read `.taste` files: [full](skills/taste-file/SKILL.md) and [compact](skills/taste-file-compact/SKILL.md) |
 
 The Python and TypeScript implementations are checked against the same fixtures in
 `spec/fixtures/`, including the exact location of every reported problem.

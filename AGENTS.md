@@ -23,6 +23,8 @@ never commit or push directly to `dev` or `main`; `main` only receives releases 
 - `viewer/` — Taste Viewer (Svelte 5, Vite, Bun). File access goes only through
   `src/lib/platform.ts`, so the planned Tauri desktop builds can swap in native implementations;
   keep it that way. App state is in `src/lib/session.svelte.ts`.
+- `skills/` — agent skills for reading `.taste` files (`taste-file`, `taste-file-compact`). Keep
+  their commands and field descriptions in step with the CLI and `SPEC.md`.
 
 ## Rules
 
